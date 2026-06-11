@@ -1652,13 +1652,13 @@ function AppContent() {
 // ─────────────────────────────────────────────────────────────
 // MAIN APP WITH ROUTER
 // ─────────────────────────────────────────────────────────────
+──────────────────────────────────────────────────────────
 
 export default function App() {
   return (
     <Router>
       <AppContent />
       <CookieBanner />
-      {/* Footer links */}
       <footer style={{
         padding: '16px 24px',
         background: '#F8FAFC',
@@ -1668,14 +1668,14 @@ export default function App() {
         display: 'flex',
         justifyContent: 'center',
         gap: '24px',
-        flexWrap: 'wrap'
+        flexWrap: 'wrap',
+        maxWidth: 440,
+        margin: '0 auto'
       }}>
         <Link to="/privacy" style={{ color: '#4F46E5', textDecoration: 'none' }}>Privacy Policy</Link>
         <Link to="/contact" style={{ color: '#4F46E5', textDecoration: 'none' }}>Contact</Link>
         <span style={{ color: '#64748B' }}>© 2026 Kinship Hub</span>
       </footer>
-
-      {/* Routes for legal pages */}
       <Routes>
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/contact" element={<Contact />} />
