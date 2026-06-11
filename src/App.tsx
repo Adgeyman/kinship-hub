@@ -485,6 +485,13 @@ function AppContent() {
     await Promise.all([loadChores(session.user.id), loadFamilyMembers(session.user.id)]);
   };
 
+  // NEW: Delete chore function
+  const deleteChore = async (choreId: string) => {
+    if (!session) return;
+    await supabase.from('chores').delete().eq('id', choreId);
+    await loadChores(session.user.id);
+  };
+
   // ── SHOPPING ──────────────────────────────────────────────
 
   const addShoppingItem = async () => {
@@ -609,6 +616,31 @@ function AppContent() {
     await loadScheduleEvents(session.user.id);
   };
 
+  // ── CANCEL SUBSCRIPTION ───────────────────────────────────
+
+  const cancelSubscription = async () => {
+    if (!session) return;
+    if (!confirm('Cancel your subscription? You will lose premium features at the end of the billing period.')) return;
+    
+    const response = await fetch(
+      'https://jzojtkrkzkzukbstbjoq.supabase.co/functions/v1/cancel-subscription',
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+    const data = await response.json();
+    if (data.success) {
+      alert('Subscription cancelled. You will lose premium features at the end of the billing period.');
+      setIsPremium(false);
+    } else {
+      alert('Error cancelling: ' + (data.error || 'Unknown error'));
+    }
+  };
+
   // ── AUTH ──────────────────────────────────────────────────
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -640,6 +672,19 @@ function AppContent() {
       if (error) setAuthError(error.message);
     }
     setAuthLoading(false);
+  };
+
+  const handleForgotPassword = async () => {
+    if (!email) {
+      alert('Enter your email address first');
+      return;
+    }
+    const { error } = await supabase.auth.resetPasswordForEmail(email);
+    if (error) {
+      alert(error.message);
+    } else {
+      alert('Password reset email sent! Check your inbox.');
+    }
   };
 
   const handleLogout = async () => {
@@ -723,6 +768,13 @@ function AppContent() {
               </button>
             </form>
 
+            {/* Forgot Password Button */}
+            {!isSigningUp && (
+              <button onClick={handleForgotPassword} style={S.forgotPasswordBtn}>
+                Forgot password?
+              </button>
+            )}
+
             <button onClick={() => { setIsSigningUp(v => !v); setAuthError(''); }} style={S.authToggle}>
               {isSigningUp
                 ? 'Already have an account? Sign In'
@@ -794,23 +846,20 @@ function AppContent() {
 
       <main style={S.main}>
 
-        {/* SCHEDULE TAB */}
+        {/* SCHEDULE TAB - NOW FREE FOR EVERYONE */}
         {currentTab === 'schedule' && (
           <div>
             <div style={S.sectionRow}>
               <h2 style={S.sectionTitle}>📅 Daily Schedule</h2>
               <button
                 style={S.smallBtn}
-                onClick={() => {
-                  if (!requirePremium('Managing the schedule')) return;
-                  setShowAddEvent(v => !v);
-                }}
+                onClick={() => setShowAddEvent(v => !v)}
               >
-                {isPremium ? '+ Add' : '+ Add 🔒'}
+                + Add
               </button>
             </div>
 
-            {showAddEvent && isPremium && (
+            {showAddEvent && (
               <div style={S.card}>
                 <div style={S.cardTitle}>New routine</div>
                 <input
@@ -858,9 +907,7 @@ function AppContent() {
                 <div style={S.emptyIcon}>📅</div>
                 <div style={S.emptyTitle}>No routines yet</div>
                 <div style={S.emptySubtitle}>
-                  {isPremium
-                    ? 'Tap + Add to create daily routines for your family'
-                    : 'Upgrade to Premium to manage your family schedule'}
+                  Tap + Add to create daily routines for your family
                 </div>
               </div>
             ) : (
@@ -885,12 +932,10 @@ function AppContent() {
                           <span style={S.eventMember}>
                             {member ? `${member.avatar_emoji} ${member.name}` : '👨‍👩‍👧 All'}
                           </span>
-                          {isPremium && (
-                            <button
-                              onClick={() => deleteScheduleEvent(evt.id)}
-                              style={S.deleteBtn}
-                            >✕</button>
-                          )}
+                          <button
+                            onClick={() => deleteScheduleEvent(evt.id)}
+                            style={S.deleteBtn}
+                          >✕</button>
                         </div>
                       );
                     })}
@@ -991,6 +1036,16 @@ function AppContent() {
                               aria-label={done ? 'Completed' : 'Mark complete'}
                             >
                               {done ? '✅' : '⬜'}
+                            </button>
+                            {/* Delete chore button */}
+                            <button
+                              onClick={() => {
+                                requirePin('Delete chore?', () => deleteChore(chore.id));
+                              }}
+                              style={S.deleteChoreBtn}
+                              aria-label="Delete chore"
+                            >
+                              ✕
                             </button>
                           </div>
                         </div>
@@ -1316,6 +1371,10 @@ function AppContent() {
                   <p style={S.subText}>
                     You have full access to all Kinship Hub features. Thank you for your support!
                   </p>
+                  {/* Cancel Subscription Button */}
+                  <button onClick={cancelSubscription} style={S.cancelSubBtn}>
+                    Cancel Subscription
+                  </button>
                 </>
               ) : (
                 <>
@@ -1453,8 +1512,17 @@ function AppContent() {
               <button
                 style={S.ghostBtn}
                 onClick={() => {
-                  pinActionRef.current = null;
-                  setShowPinSetup(true);
+                  if (parentPinHash) {
+                    // PIN exists — verify before allowing change
+                    requirePin('Enter current PIN to change it', () => {
+                      setShowPinSetup(true);
+                      pinActionRef.current = null;
+                    });
+                  } else {
+                    // No PIN set yet
+                    setShowPinSetup(true);
+                    pinActionRef.current = null;
+                  }
                 }}
               >
                 {parentPinHash ? '🔄 Change Parent PIN' : '🔐 Set Parent PIN'}
@@ -1653,7 +1721,6 @@ function AppContent() {
 // MAIN APP WITH ROUTER
 // ─────────────────────────────────────────────────────────────
 
-
 export default function App() {
   return (
     <Router>
@@ -1772,6 +1839,16 @@ const S: Record<string, React.CSSProperties> = {
     textAlign: 'center',
     padding: 4,
   },
+  forgotPasswordBtn: {
+    background: 'none',
+    border: 'none',
+    color: '#4F46E5',
+    fontSize: 13,
+    cursor: 'pointer',
+    textAlign: 'right',
+    marginTop: 4,
+    textDecoration: 'underline',
+  },
   authFeatureList: {
     display: 'flex',
     flexDirection: 'column',
@@ -1852,6 +1929,29 @@ const S: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     fontSize: 14,
     marginTop: 4,
+  },
+  cancelSubBtn: {
+    width: '100%',
+    padding: 13,
+    borderRadius: 12,
+    border: '2px solid #DC2626',
+    background: 'transparent',
+    color: '#DC2626',
+    fontWeight: 700,
+    cursor: 'pointer',
+    fontSize: 14,
+    marginTop: 8,
+  },
+  deleteChoreBtn: {
+    background: 'none',
+    border: 'none',
+    color: '#EF4444',
+    cursor: 'pointer',
+    fontSize: 16,
+    padding: '2px 6px',
+    borderRadius: 6,
+    fontWeight: 700,
+    marginLeft: 4,
   },
   fieldLabel: { fontSize: 13, color: '#64748B', whiteSpace: 'nowrap' as const, flexShrink: 0 },
   header: {
