@@ -4,6 +4,7 @@ import { supabase } from './supabaseClient';
 import CookieBanner from './components/CookieBanner';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import Contact from './pages/Contact';
+import ResetPassword from './pages/ResetPassword';
 
 // ─────────────────────────────────────────────────────────────
 // TYPES
@@ -1746,6 +1747,7 @@ export default function App() {
       <Routes>
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/contact" element={<Contact />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
       </Routes>
     </Router>
   );
