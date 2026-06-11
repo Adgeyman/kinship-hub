@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import { supabase } from './supabaseClient';
+import CookieBanner from './components/CookieBanner';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import Contact from './pages/Contact';
 
 // ─────────────────────────────────────────────────────────────
 // TYPES
@@ -196,7 +200,7 @@ const PinModal: React.FC<PinModalProps> = ({
 // MAIN APP
 // ─────────────────────────────────────────────────────────────
 
-export default function App() {
+function AppContent() {
   // ── Auth ──────────────────────────────────────────────────
   const [session, setSession] = useState<any>(null);
   const [email, setEmail] = useState('');
@@ -1584,63 +1588,50 @@ export default function App() {
                   </div>
                 ))}
                 <button
-  onClick={async () => {
-    try {
-      // Get the current session
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        alert('Please sign in first');
-        return;
-      }
-      
-      // Get the current user's ID
-      const userId = session.user.id;
-      
-      // Your Stripe Price ID
-      const priceId = 'price_1TgRgLHHCEhBuy6i7fINmByY';
-      
-      // Success and cancel URLs
-      const successUrl = `${window.location.origin}/settings`;
-      const cancelUrl = `${window.location.origin}/pricing`;
-      
-      // Call your Edge Function with the required data
-      const response = await fetch(
-        'https://jzojtkrkzkzukbstbjoq.supabase.co/functions/v1/create-checkout-session',
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            priceId: priceId,
-            userId: userId,
-            successUrl: successUrl,
-            cancelUrl: cancelUrl
-          }),
-        }
-      );
-      
-      const data = await response.json();
-      
-      if (data.url) {
-        // Redirect to Stripe checkout
-        window.location.href = data.url;
-      } else if (data.error) {
-        alert('Payment error: ' + data.error);
-      } else {
-        alert('Something went wrong. Please try again.');
-      }
-    } catch (error) {
-      console.error('Error:', error);
-      alert('Payment error. Please try again.');
-    }
-  }}
-  style={S.upgradePlanBtn}
->
-  ✨ Upgrade Now — £2.99/mo
-</button>
+                  onClick={async () => {
+                    try {
+                      const { data: { session } } = await supabase.auth.getSession();
+                      if (!session) {
+                        alert('Please sign in first');
+                        return;
+                      }
+                      const userId = session.user.id;
+                      const priceId = 'price_1TgRgLHHCEhBuy6i7fINmByY';
+                      const successUrl = `${window.location.origin}/settings`;
+                      const cancelUrl = `${window.location.origin}/pricing`;
+                      const response = await fetch(
+                        'https://jzojtkrkzkzukbstbjoq.supabase.co/functions/v1/create-checkout-session',
+                        {
+                          method: 'POST',
+                          headers: {
+                            'Authorization': `Bearer ${session.access_token}`,
+                            'Content-Type': 'application/json',
+                          },
+                          body: JSON.stringify({
+                            priceId: priceId,
+                            userId: userId,
+                            successUrl: successUrl,
+                            cancelUrl: cancelUrl
+                          }),
+                        }
+                      );
+                      const data = await response.json();
+                      if (data.url) {
+                        window.location.href = data.url;
+                      } else if (data.error) {
+                        alert('Payment error: ' + data.error);
+                      } else {
+                        alert('Something went wrong. Please try again.');
+                      }
+                    } catch (error) {
+                      console.error('Error:', error);
+                      alert('Payment error. Please try again.');
+                    }
+                  }}
+                  style={S.upgradePlanBtn}
+                >
+                  ✨ Upgrade Now — £2.99/mo
+                </button>
               </div>
             </div>
 
@@ -1659,7 +1650,42 @@ export default function App() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// DESIGN SYSTEM — All inline styles in one place
+// MAIN APP WITH ROUTER
+// ─────────────────────────────────────────────────────────────
+
+export default function App() {
+  return (
+    <Router>
+      <AppContent />
+      <CookieBanner />
+      {/* Footer links */}
+      <footer style={{
+        padding: '16px 24px',
+        background: '#F8FAFC',
+        borderTop: '1px solid #E2E8F0',
+        textAlign: 'center',
+        fontSize: '13px',
+        display: 'flex',
+        justifyContent: 'center',
+        gap: '24px',
+        flexWrap: 'wrap'
+      }}>
+        <Link to="/privacy" style={{ color: '#4F46E5', textDecoration: 'none' }}>Privacy Policy</Link>
+        <Link to="/contact" style={{ color: '#4F46E5', textDecoration: 'none' }}>Contact</Link>
+        <span style={{ color: '#64748B' }}>© 2026 Kinship Hub</span>
+      </footer>
+
+      {/* Routes for legal pages */}
+      <Routes>
+        <Route path="/privacy" element={<PrivacyPolicy />} />
+        <Route path="/contact" element={<Contact />} />
+      </Routes>
+    </Router>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// DESIGN SYSTEM — All inline styles
 // ─────────────────────────────────────────────────────────────
 
 const S: Record<string, React.CSSProperties> = {
