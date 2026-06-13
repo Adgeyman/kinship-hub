@@ -5,6 +5,7 @@ import CookieBanner from './components/CookieBanner';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import Contact from './pages/Contact';
 import ResetPassword from './pages/ResetPassword';
+import FAQ from './pages/FAQ';
 
 // ─────────────────────────────────────────────────────────────
 // TYPES
@@ -1742,12 +1743,14 @@ export default function App() {
       }}>
         <Link to="/privacy" style={{ color: '#4F46E5', textDecoration: 'none' }}>Privacy Policy</Link>
         <Link to="/contact" style={{ color: '#4F46E5', textDecoration: 'none' }}>Contact</Link>
+        <Link to="/faq" style={{ color: '#4F46E5', textDecoration: 'none' }}>FAQ</Link>
         <span style={{ color: '#64748B' }}>© 2026 Kinship Hub</span>
       </footer>
       <Routes>
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/contact" element={<Contact />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/faq" element={<FAQ />} />
       </Routes>
     </Router>
   );
