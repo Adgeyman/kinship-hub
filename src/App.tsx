@@ -27,6 +27,8 @@ interface ScheduleEvent {
   time: string;
   day_of_week: number;
   duration_minutes: number;
+  event_date: string | null;  // ← ADD THIS LINE
+
 }
 
 interface Chore {
