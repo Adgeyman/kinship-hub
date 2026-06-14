@@ -320,15 +320,16 @@ function AppContent() {
     if (data) setFamilyMembers(data);
   };
 
-  const loadScheduleEvents = async (userId: string) => {
-    const { data } = await supabase
-      .from('schedule_events')
-      .select('*')
-      .eq('user_id', userId)
-      .order('day_of_week')
-      .order('time');
-    if (data) setScheduleEvents(data);
-  };
+const loadScheduleEvents = async (userId: string) => {
+  const { data } = await supabase
+    .from('schedule_events')
+    .select('*')
+    .eq('user_id', userId)
+    .order('event_date', { nullsFirst: false })
+    .order('day_of_week')
+    .order('time');
+  if (data) setScheduleEvents(data);
+};
 
   const loadChores = async (userId: string) => {
     const { data } = await supabase
