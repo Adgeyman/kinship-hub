@@ -250,6 +250,7 @@ function AppContent() {
   const [newEventTitle, setNewEventTitle] = useState('');
   const [newEventTime, setNewEventTime] = useState('08:00');
   const [newEventDay, setNewEventDay] = useState(1);
+  const [newEventDate, setNewEventDate] = useState('');  // ← ADD THIS
   const [newEventMemberId, setNewEventMemberId] = useState('');
 
   // ── Settings UI ───────────────────────────────────────────
@@ -599,20 +600,30 @@ function AppContent() {
 
   // ── SCHEDULE ──────────────────────────────────────────────
 
-  const addScheduleEvent = async () => {
-    if (!newEventTitle.trim() || !session) return;
-    await supabase.from('schedule_events').insert([{
-      user_id: session.user.id,
-      title: newEventTitle.trim(),
-      family_member_id: newEventMemberId || null,
-      time: newEventTime,
-      day_of_week: newEventDay,
-      duration_minutes: 60,
-    }]);
-    await loadScheduleEvents(session.user.id);
-    setNewEventTitle('');
-    setShowAddEvent(false);
-  };
+const addScheduleEvent = async () => {
+  if (!newEventTitle.trim() || !session) return;
+  
+  // Use the selected date if provided, otherwise use null
+  const eventDate = newEventDate || null;
+  
+  await supabase.from('schedule_events').insert([{
+    user_id: session.user.id,
+    title: newEventTitle.trim(),
+    family_member_id: newEventMemberId || null,
+    time: newEventTime,
+    day_of_week: newEventDay,
+    duration_minutes: 60,
+    event_date: eventDate,  // ← ADD THIS
+  }]);
+  
+  await loadScheduleEvents(session.user.id);
+  setNewEventTitle('');
+  setNewEventTime('08:00');
+  setNewEventDay(1);
+  setNewEventDate('');  // ← ADD THIS
+  setNewEventMemberId('');
+  setShowAddEvent(false);
+};
 
   const deleteScheduleEvent = async (id: string) => {
     if (!session) return;
@@ -850,77 +861,146 @@ function AppContent() {
 
       <main style={S.main}>
 
-        {/* SCHEDULE TAB - NOW FREE FOR EVERYONE */}
-        {currentTab === 'schedule' && (
-          <div>
-            <div style={S.sectionRow}>
-              <h2 style={S.sectionTitle}>📅 Daily Schedule</h2>
-              <button
-                style={S.smallBtn}
-                onClick={() => setShowAddEvent(v => !v)}
-              >
-                + Add
-              </button>
+{/* SCHEDULE TAB - NOW FREE FOR EVERYONE */}
+{currentTab === 'schedule' && (
+  <div>
+    <div style={S.sectionRow}>
+      <h2 style={S.sectionTitle}>📅 Family Schedule</h2>
+      <button
+        style={S.smallBtn}
+        onClick={() => setShowAddEvent(v => !v)}
+      >
+        + Add
+      </button>
+    </div>
+
+    {showAddEvent && (
+      <div style={S.card}>
+        <div style={S.cardTitle}>New Event</div>
+        <input
+          value={newEventTitle}
+          onChange={e => setNewEventTitle(e.target.value)}
+          placeholder="e.g. Morning routine, Homework time, Doctor appointment"
+          style={S.input}
+        />
+        <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+          <select
+            value={newEventDay}
+            onChange={e => setNewEventDay(+e.target.value)}
+            style={{ ...S.input, flex: 1 }}
+          >
+            {DAYS.map((d, i) => (
+              <option key={d} value={i}>{d}</option>
+            ))}
+          </select>
+          <input
+            type="time"
+            value={newEventTime}
+            onChange={e => setNewEventTime(e.target.value)}
+            style={{ ...S.input, flex: 1 }}
+          />
+        </div>
+        
+        {/* DATE PICKER - NEW */}
+        <div style={{ marginTop: '10px' }}>
+          <input
+            type="date"
+            value={newEventDate}
+            onChange={e => setNewEventDate(e.target.value)}
+            style={S.input}
+          />
+          <small style={{ fontSize: '11px', color: '#64748B', marginTop: '4px', display: 'block' }}>
+            Leave blank for weekly recurring event
+          </small>
+        </div>
+        
+        <select
+          value={newEventMemberId}
+          onChange={e => setNewEventMemberId(e.target.value)}
+          style={{ ...S.input, marginTop: '10px' }}
+        >
+          <option value="">Whole family</option>
+          {familyMembers.map(m => (
+            <option key={m.id} value={m.id}>{m.avatar_emoji} {m.name}</option>
+          ))}
+        </select>
+        <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+          <button onClick={addScheduleEvent} style={S.smallBtn}>Save</button>
+          <button onClick={() => setShowAddEvent(false)} style={S.ghostBtn}>Cancel</button>
+        </div>
+      </div>
+    )}
+
+    {scheduleEvents.length === 0 ? (
+      <div style={S.emptyState}>
+        <div style={S.emptyIcon}>📅</div>
+        <div style={S.emptyTitle}>No events yet</div>
+        <div style={S.emptySubtitle}>
+          Tap + Add to create events for your family
+        </div>
+      </div>
+    ) : (
+      <div>
+        {/* DATED EVENTS (Specific dates) */}
+        {(() => {
+          const datedEvents = scheduleEvents.filter(e => e.event_date);
+          const groupedByDate: Record<string, typeof scheduleEvents> = {};
+          datedEvents.forEach(event => {
+            const dateKey = event.event_date!;
+            if (!groupedByDate[dateKey]) groupedByDate[dateKey] = [];
+            groupedByDate[dateKey].push(event);
+          });
+          const sortedDates = Object.keys(groupedByDate).sort();
+          
+          return sortedDates.map(date => (
+            <div key={date} style={S.card}>
+              <div style={S.dayLabel}>
+                📅 {new Date(date).toLocaleDateString('en-GB', { 
+                  weekday: 'long', 
+                  day: 'numeric', 
+                  month: 'long' 
+                })}
+              </div>
+              {groupedByDate[date].map(evt => {
+                const member = familyMembers.find(m => m.id === evt.family_member_id);
+                return (
+                  <div key={evt.id} style={S.eventRow}>
+                    <div
+                      style={{
+                        ...S.eventDot,
+                        backgroundColor: member?.color ?? '#94A3B8',
+                      }}
+                    />
+                    <span style={S.eventTime}>{evt.time}</span>
+                    <span style={S.eventTitle}>{evt.title}</span>
+                    <span style={S.eventMember}>
+                      {member ? `${member.avatar_emoji} ${member.name}` : '👨‍👩‍👧 All'}
+                    </span>
+                    <button
+                      onClick={() => deleteScheduleEvent(evt.id)}
+                      style={S.deleteBtn}
+                    >✕</button>
+                  </div>
+                );
+              })}
             </div>
-
-            {showAddEvent && (
-              <div style={S.card}>
-                <div style={S.cardTitle}>New routine</div>
-                <input
-                  value={newEventTitle}
-                  onChange={e => setNewEventTitle(e.target.value)}
-                  placeholder="e.g. Morning routine, Homework time"
-                  style={S.input}
-                />
-                <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
-                  <select
-                    value={newEventDay}
-                    onChange={e => setNewEventDay(+e.target.value)}
-                    style={{ ...S.input, flex: 1 }}
-                  >
-                    {DAYS.map((d, i) => (
-                      <option key={d} value={i}>{d}</option>
-                    ))}
-                  </select>
-                  <input
-                    type="time"
-                    value={newEventTime}
-                    onChange={e => setNewEventTime(e.target.value)}
-                    style={{ ...S.input, flex: 1 }}
-                  />
-                </div>
-                <select
-                  value={newEventMemberId}
-                  onChange={e => setNewEventMemberId(e.target.value)}
-                  style={{ ...S.input, marginTop: '10px' }}
-                >
-                  <option value="">Whole family</option>
-                  {familyMembers.map(m => (
-                    <option key={m.id} value={m.id}>{m.avatar_emoji} {m.name}</option>
-                  ))}
-                </select>
-                <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
-                  <button onClick={addScheduleEvent} style={S.smallBtn}>Save</button>
-                  <button onClick={() => setShowAddEvent(false)} style={S.ghostBtn}>Cancel</button>
-                </div>
-              </div>
-            )}
-
-            {scheduleEvents.length === 0 ? (
-              <div style={S.emptyState}>
-                <div style={S.emptyIcon}>📅</div>
-                <div style={S.emptyTitle}>No routines yet</div>
-                <div style={S.emptySubtitle}>
-                  Tap + Add to create daily routines for your family
-                </div>
-              </div>
-            ) : (
-              DAYS.map((day, i) => {
-                const dayEvents = scheduleEvents.filter(e => e.day_of_week === i);
+          ));
+        })()}
+        
+        {/* RECURRING EVENTS (Weekly by day of week) */}
+        {(() => {
+          const recurringEvents = scheduleEvents.filter(e => !e.event_date);
+          if (recurringEvents.length === 0) return null;
+          
+          return (
+            <div style={S.card}>
+              <div style={S.dayLabel}>🔄 Weekly Recurring</div>
+              {DAYS.map((day, i) => {
+                const dayEvents = recurringEvents.filter(e => e.day_of_week === i);
                 if (!dayEvents.length) return null;
                 return (
-                  <div key={day} style={S.card}>
-                    <div style={S.dayLabel}>{day}</div>
+                  <div key={day}>
+                    <div style={{ fontSize: '12px', fontWeight: 'bold', marginTop: '8px', color: '#4F46E5' }}>{day}</div>
                     {dayEvents.map(evt => {
                       const member = familyMembers.find(m => m.id === evt.family_member_id);
                       return (
@@ -945,10 +1025,14 @@ function AppContent() {
                     })}
                   </div>
                 );
-              })
-            )}
-          </div>
-        )}
+              })}
+            </div>
+          );
+        })()}
+      </div>
+    )}
+  </div>
+)}
 
         {/* CHORES TAB */}
         {currentTab === 'chores' && (
