@@ -6,6 +6,7 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import Contact from './pages/Contact';
 import ResetPassword from './pages/ResetPassword';
 import FAQ from './pages/FAQ';
+import AddToHomeScreen from './components/AddToHomeScreen';
 
 // ─────────────────────────────────────────────────────────────
 // TYPES
