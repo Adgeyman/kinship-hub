@@ -796,7 +796,7 @@ function AppContent() {
 
             {isSigningUp && (
               <div style={S.authFeatureList}>
-                <div style={S.authFeatureItem}>✅ Up to 3 family members free</div>
+                <div style={S.authFeatureItem}>✅ Up to 4 family members free</div>
                 <div style={S.authFeatureItem}>✅ Chores, points & rewards</div>
                 <div style={S.authFeatureItem}>✅ Shopping list</div>
                 <div style={S.authFeatureItem}>✅ Parent PIN protection</div>
