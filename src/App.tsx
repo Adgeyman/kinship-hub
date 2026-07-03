@@ -37,6 +37,9 @@ interface Chore {
   family_member_id: string;
   points: number;
   last_completed: string | null;
+  status: 'pending' | 'approved' | 'denied' | 'completed';
+  completed_by: string | null;
+  completed_at: string | null;
 }
 
 interface ShoppingItem {
@@ -234,6 +237,7 @@ function AppContent() {
   const [newChoreTitle, setNewChoreTitle] = useState('');
   const [newChorePoints, setNewChorePoints] = useState(10);
   const [choreAnimation, setChoreAnimation] = useState<string | null>(null);
+  const [pendingChores, setPendingChores] = useState<Chore[]>([]);
 
   // ── Shopping UI ───────────────────────────────────────────
   const [newShoppingItem, setNewShoppingItem] = useState('');
@@ -335,8 +339,12 @@ function AppContent() {
     const { data } = await supabase
       .from('chores')
       .select('*')
-      .eq('user_id', userId);
-    if (data) setChores(data);
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    if (data) {
+      setChores(data);
+      setPendingChores(data.filter((c: Chore) => c.status === 'pending'));
+    }
   };
 
   const loadShoppingList = async (userId: string) => {
@@ -464,6 +472,7 @@ function AppContent() {
       title: newChoreTitle.trim(),
       points: newChorePoints,
       frequency: 'daily',
+      status: 'completed',
     }]);
     await loadChores(session.user.id);
     setNewChoreTitle('');
@@ -473,22 +482,55 @@ function AppContent() {
 
   const completeChore = async (choreId: string) => {
     if (!session) return;
-    const today = new Date().toISOString().split('T')[0];
     const chore = chores.find(c => c.id === choreId);
-    if (!chore || chore.last_completed === today) return;
+    if (!chore) return;
+    if (chore.status === 'pending' || chore.status === 'approved') return;
 
+    await supabase
+      .from('chores')
+      .update({
+        status: 'pending',
+        completed_by: session.user.id,
+        completed_at: new Date().toISOString(),
+      })
+      .eq('id', choreId);
+
+    await loadChores(session.user.id);
+    alert('✅ Chore marked as done! Waiting for parent approval.');
+  };
+
+  const approveChore = async (chore: Chore) => {
+    if (!session) return;
+    const today = new Date().toISOString().split('T')[0];
     const member = familyMembers.find(m => m.id === chore.family_member_id);
+    
     await Promise.all([
-      supabase.from('chores').update({ last_completed: today }).eq('id', choreId),
+      supabase
+        .from('chores')
+        .update({
+          status: 'approved',
+          last_completed: today,
+        })
+        .eq('id', chore.id),
       member && supabase
         .from('family_members')
         .update({ total_points: member.total_points + chore.points })
         .eq('id', member.id),
     ]);
 
-    setChoreAnimation(choreId);
-    setTimeout(() => setChoreAnimation(null), 700);
     await Promise.all([loadChores(session.user.id), loadFamilyMembers(session.user.id)]);
+    alert(`✅ ${member?.name} earned ${chore.points} points for "${chore.title}"!`);
+  };
+
+  const denyChore = async (choreId: string) => {
+    if (!session) return;
+    await supabase
+      .from('chores')
+      .update({ status: 'denied' })
+      .eq('id', choreId);
+
+    await loadChores(session.user.id);
+    alert('❌ Chore denied. No points awarded.');
   };
 
   const deleteChore = async (choreId: string) => {
@@ -720,14 +762,14 @@ function AppContent() {
 
   const getTodayPoints = (memberId: string) =>
     chores
-      .filter(c => c.family_member_id === memberId && c.last_completed === today)
+      .filter(c => c.family_member_id === memberId && c.last_completed === today && c.status === 'approved')
       .reduce((sum, c) => sum + c.points, 0);
 
   const getCompletionRate = (memberId: string) => {
-    const mc = chores.filter(c => c.family_member_id === memberId);
+    const mc = chores.filter(c => c.family_member_id === memberId && c.status !== 'denied');
     if (!mc.length) return 0;
     return Math.round(
-      (mc.filter(c => c.last_completed === today).length / mc.length) * 100
+      (mc.filter(c => c.last_completed === today && c.status === 'approved').length / mc.length) * 100
     );
   };
 
@@ -840,7 +882,7 @@ function AppContent() {
           { id: 'chores',   icon: '⭐', label: 'Chores' },
           { id: 'shopping', icon: '🛒', label: 'Shopping' },
           { id: 'rewards',  icon: '🎁', label: 'Rewards' },
-          { id: 'settings', icon: '⚙️', label: 'Settings', badge: pendingRequests.length },
+          { id: 'settings', icon: '⚙️', label: 'Settings', badge: pendingRequests.length + pendingChores.length },
         ] as const).map(tab => (
           <button
             key={tab.id}
@@ -938,7 +980,6 @@ function AppContent() {
               </div>
             ) : (
               <div>
-                {/* DATED EVENTS (Specific dates) */}
                 {(() => {
                   const datedEvents = scheduleEvents.filter(e => e.event_date);
                   const groupedByDate: Record<string, typeof scheduleEvents> = {};
@@ -984,7 +1025,6 @@ function AppContent() {
                   ));
                 })()}
                 
-                {/* RECURRING EVENTS (Weekly by day of week) */}
                 {(() => {
                   const recurringEvents = scheduleEvents.filter(e => !e.event_date);
                   if (recurringEvents.length === 0) return null;
@@ -1044,7 +1084,7 @@ function AppContent() {
               </div>
             ) : (
               familyMembers.map(member => {
-                const memberChores = chores.filter(c => c.family_member_id === member.id);
+                const memberChores = chores.filter(c => c.family_member_id === member.id && c.status !== 'denied');
                 const rate = getCompletionRate(member.id);
                 const todayPts = getTodayPoints(member.id);
                 const allDone = memberChores.length > 0 && rate === 100;
@@ -1093,8 +1133,17 @@ function AppContent() {
                       </div>
                     )}
                     {memberChores.map(chore => {
-                      const done = chore.last_completed === today;
+                      const done = chore.last_completed === today && chore.status === 'approved';
+                      const isPending = chore.status === 'pending';
+                      const isDenied = chore.status === 'denied';
                       const animating = choreAnimation === chore.id;
+                      
+                      let statusEmoji = '⬜';
+                      let statusLabel = 'Mark complete';
+                      if (done) { statusEmoji = '✅'; statusLabel = 'Completed'; }
+                      else if (isPending) { statusEmoji = '⏳'; statusLabel = 'Pending approval...'; }
+                      else if (isDenied) { statusEmoji = '❌'; statusLabel = 'Denied'; }
+
                       return (
                         <div
                           key={chore.id}
@@ -1104,31 +1153,25 @@ function AppContent() {
                             style={{
                               ...S.choreText,
                               textDecoration: done ? 'line-through' : 'none',
-                              opacity: done ? 0.4 : 1,
+                              opacity: done || isDenied ? 0.4 : 1,
                             }}
                           >
                             {chore.title}
                           </span>
                           <div style={S.choreRight}>
                             <span style={S.chorePoints}>+{chore.points}⭐</span>
-                            <button
-                              onClick={() => completeChore(chore.id)}
-                              style={{
-                                ...S.checkBtn,
-                                transform: animating ? 'scale(1.5)' : 'scale(1)',
-                                transition: 'transform 0.2s ease',
-                              }}
-                              aria-label={done ? 'Completed' : 'Mark complete'}
-                            >
-                              {done ? '✅' : '⬜'}
-                            </button>
-                            <button
+                            <button 
                               onClick={() => {
-                                requirePin('Delete chore?', () => deleteChore(chore.id));
-                              }}
-                              style={S.deleteChoreBtn}
-                              aria-label="Delete chore"
+                                if (isPending || done || isDenied) return;
+                                completeChore(chore.id);
+                              }} 
+                              style={S.checkBtn}
+                              title={statusLabel}
+                              disabled={isPending || done || isDenied}
                             >
+                              {isPending ? '⏳' : done ? '✅' : isDenied ? '❌' : '⬜'}
+                            </button>
+                            <button onClick={() => { requirePin('Delete chore?', () => deleteChore(chore.id)); }} style={S.deleteChoreBtn}>
                               ✕
                             </button>
                           </div>
@@ -1167,7 +1210,7 @@ function AppContent() {
                         style={S.addChoreBtn}
                         onClick={() => {
                           const count = chores.filter(
-                            c => c.family_member_id === member.id
+                            c => c.family_member_id === member.id && c.status !== 'denied'
                           ).length;
                           if (!isPremium && count >= FREE_CHORE_LIMIT) {
                             requirePremium(`more than ${FREE_CHORE_LIMIT} chores per person`);
@@ -1178,7 +1221,7 @@ function AppContent() {
                       >
                         + Add chore
                         {!isPremium &&
-                          chores.filter(c => c.family_member_id === member.id).length >=
+                          chores.filter(c => c.family_member_id === member.id && c.status !== 'denied').length >=
                             FREE_CHORE_LIMIT &&
                           ' 🔒'}
                       </button>
@@ -1483,6 +1526,54 @@ function AppContent() {
                 <li><strong>Android:</strong> Tap the Menu icon (three dots ⋮) → Tap "Install App" or "Add to Home Screen" → Follow the prompts</li>
               </ul>
             </div>
+
+            {/* PENDING CHORES - NEW */}
+            {pendingChores.length > 0 && (
+              <div style={S.card}>
+                <div style={S.cardTitle}>
+                  ⏳ Pending Chores{' '}
+                  <span style={S.badgeInline}>{pendingChores.length}</span>
+                </div>
+                {pendingChores.map(chore => {
+                  const member = familyMembers.find(m => m.id === chore.family_member_id);
+                  const child = familyMembers.find(m => m.id === chore.completed_by);
+                  return (
+                    <div key={chore.id} style={S.requestRow}>
+                      <span style={{ fontSize: 28 }}>⭐</span>
+                      <div style={S.requestInfo}>
+                        <div style={S.requestName}>
+                          {member?.avatar_emoji} {member?.name} wants credit for: <strong>{chore.title}</strong>
+                        </div>
+                        <div style={S.requestMeta}>
+                          {chore.points}⭐ · Completed by {child?.name || 'Someone'} ·{' '}
+                          {chore.completed_at ? new Date(chore.completed_at).toLocaleDateString('en-GB') : ''}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button
+                          style={S.approveBtn}
+                          onClick={() =>
+                            requirePin('Approve chore?', () => approveChore(chore))
+                          }
+                          title="Approve"
+                        >
+                          ✓
+                        </button>
+                        <button
+                          style={S.denyBtn}
+                          onClick={() =>
+                            requirePin('Deny chore?', () => denyChore(chore.id))
+                          }
+                          title="Deny"
+                        >
+                          ✗
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
             {pendingRequests.length > 0 && (
               <div style={S.card}>
