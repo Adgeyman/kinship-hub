@@ -1710,7 +1710,7 @@ function AppContent() {
                   £0<span style={S.planPer}> forever</span>
                 </div>
                 {[
-                  ['✅', '3 family members'],
+                  ['✅', '4 family members'],
                   ['✅', 'Shopping list'],
                   ['✅', '8 chores / person'],
                   ['✅', '5 rewards'],
