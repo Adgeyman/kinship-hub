@@ -5,6 +5,7 @@ import CookieBanner from './components/CookieBanner';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import Contact from './pages/Contact';
 import ResetPassword from './pages/ResetPassword';
+import ResetPin from './pages/ResetPin';
 import FAQ from './pages/FAQ';
 import AddToHomeScreen from './components/AddToHomeScreen';
 
@@ -198,6 +199,14 @@ const PinModal: React.FC<PinModalProps> = ({
           <button style={S.keypadBtn} onClick={() => setDigits(p => p.slice(0, -1))}>⌫</button>
         </div>
         <button style={S.pinCancelBtn} onClick={onCancel}>Cancel</button>
+        <button
+          style={S.pinForgotBtn}
+          onClick={() => {
+            onCancel();
+          }}
+        >
+          Forgot PIN?
+        </button>
       </div>
     </div>
   );
@@ -439,6 +448,28 @@ function AppContent() {
       setShowPinSetup(false);
       pinActionRef.current?.();
       pinActionRef.current = null;
+    }
+  };
+
+  // ── PIN RECOVERY ──────────────────────────────────────────
+
+  const handleForgotPin = async () => {
+    if (!session?.user?.email) {
+      alert('No email address found for your account.');
+      return;
+    }
+    
+    const { error } = await supabase.auth.resetPasswordForEmail(
+      session.user.email,
+      {
+        redirectTo: `${window.location.origin}/reset-pin`,
+      }
+    );
+    
+    if (error) {
+      alert('Error sending PIN reset email: ' + error.message);
+    } else {
+      alert('📧 PIN reset email sent! Check your inbox.');
     }
   };
 
@@ -1527,7 +1558,7 @@ function AppContent() {
               </ul>
             </div>
 
-            {/* PENDING CHORES - NEW */}
+            {/* PENDING CHORES */}
             {pendingChores.length > 0 && (
               <div style={S.card}>
                 <div style={S.cardTitle}>
@@ -1935,6 +1966,7 @@ export default function App() {
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/contact" element={<Contact />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/reset-pin" element={<ResetPin />} />
         <Route path="/faq" element={<FAQ />} />
       </Routes>
     </Router>
@@ -2762,4 +2794,18 @@ const S: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     padding: 4,
   },
+  pinForgotBtn: {
+    border: 'none',
+    background: 'transparent',
+    color: '#4F46E5',
+    fontSize: 13,
+    cursor: 'pointer',
+    padding: 4,
+    textDecoration: 'underline',
+    marginTop: 4,
+  },
 };
+
+// ─────────────────────────────────────────────────────────────
+// DESIGN SYSTEM END
+// ─────────────────────────────────────────────────────────────
