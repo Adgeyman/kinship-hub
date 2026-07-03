@@ -70,7 +70,7 @@ interface RewardRequest {
 // FREE TIER LIMITS
 // ─────────────────────────────────────────────────────────────
 
-const FREE_MEMBER_LIMIT = 3;
+const FREE_MEMBER_LIMIT = 4;
 const FREE_CHORE_LIMIT = 8;
 const FREE_REWARD_LIMIT = 5;
 
