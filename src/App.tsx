@@ -1884,7 +1884,7 @@ function AppContent() {
                         return;
                       }
                       const userId = session.user.id;
-                      const priceId = 'price_1TgRgLHHCEhBuy6i7fINmByY';
+                      const priceId = 'price_1TpS96HTEe9TJXX2hO9B9NlP';
                       const successUrl = `${window.location.origin}/settings`;
                       const cancelUrl = `${window.location.origin}/pricing`;
                       const response = await fetch(
