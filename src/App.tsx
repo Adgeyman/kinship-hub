@@ -123,6 +123,7 @@ interface PinModalProps {
   isSettingPin?: boolean;
   onSuccess: (pin: string) => void;
   onCancel: () => void;
+  onForgotPin?: () => void;
   errorMessage?: string;
 }
 
@@ -131,6 +132,7 @@ const PinModal: React.FC<PinModalProps> = ({
   isSettingPin = false,
   onSuccess,
   onCancel,
+  onForgotPin,
   errorMessage,
 }) => {
   const [stage, setStage] = useState<'enter' | 'confirm'>('enter');
@@ -203,6 +205,7 @@ const PinModal: React.FC<PinModalProps> = ({
           style={S.pinForgotBtn}
           onClick={() => {
             onCancel();
+            if (onForgotPin) onForgotPin();
           }}
         >
           Forgot PIN?
@@ -1768,6 +1771,7 @@ function AppContent() {
             setShowPinSetup(false);
             pinActionRef.current = null;
           }}
+          onForgotPin={handleForgotPin}
         />
       )}
 
@@ -1781,6 +1785,7 @@ function AppContent() {
             setPinError('');
             pinActionRef.current = null;
           }}
+          onForgotPin={handleForgotPin}
           errorMessage={pinError}
         />
       )}
@@ -2805,7 +2810,3 @@ const S: Record<string, React.CSSProperties> = {
     marginTop: 4,
   },
 };
-
-// ─────────────────────────────────────────────────────────────
-// DESIGN SYSTEM END
-// ─────────────────────────────────────────────────────────────
