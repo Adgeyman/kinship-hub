@@ -248,8 +248,6 @@ function AppContent() {
   const [showAddChoreFor, setShowAddChoreFor] = useState<string | null>(null);
   const [newChoreTitle, setNewChoreTitle] = useState('');
   const [newChorePoints, setNewChorePoints] = useState(10);
-  // @ts-ignore
-  const [choreAnimation, setChoreAnimation] = useState<string | null>(null);
   const [pendingChores, setPendingChores] = useState<Chore[]>([]);
 
   // ── Shopping UI ───────────────────────────────────────────
@@ -1171,13 +1169,11 @@ function AppContent() {
                       const done = chore.last_completed === today && chore.status === 'approved';
                       const isPending = chore.status === 'pending';
                       const isDenied = chore.status === 'denied';
-                      const animating = choreAnimation === chore.id;
-                      
-                      let statusEmoji = '⬜';
+
                       let statusLabel = 'Mark complete';
-                      if (done) { statusEmoji = '✅'; statusLabel = 'Completed'; }
-                      else if (isPending) { statusEmoji = '⏳'; statusLabel = 'Pending approval...'; }
-                      else if (isDenied) { statusEmoji = '❌'; statusLabel = 'Denied'; }
+                      if (done) { statusLabel = 'Completed'; }
+                      else if (isPending) { statusLabel = 'Pending approval...'; }
+                      else if (isDenied) { statusLabel = 'Denied'; }
 
                       return (
                         <div
