@@ -248,6 +248,7 @@ function AppContent() {
   const [showAddChoreFor, setShowAddChoreFor] = useState<string | null>(null);
   const [newChoreTitle, setNewChoreTitle] = useState('');
   const [newChorePoints, setNewChorePoints] = useState(10);
+  // @ts-ignore
   const [choreAnimation, setChoreAnimation] = useState<string | null>(null);
   const [pendingChores, setPendingChores] = useState<Chore[]>([]);
 
