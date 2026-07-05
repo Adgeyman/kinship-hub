@@ -763,18 +763,20 @@ function AppContent() {
     setAuthLoading(false);
   };
 
-  const handleForgotPassword = async () => {
-    if (!email) {
-      alert('Enter your email address first');
-      return;
-    }
-    const { error } = await supabase.auth.resetPasswordForEmail(email);
-    if (error) {
-      alert(error.message);
-    } else {
-      alert('Password reset email sent! Check your inbox.');
-    }
-  };
+ const handleForgotPassword = async () => {
+  if (!email) {
+    alert('Enter your email address first');
+    return;
+  }
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}/reset-password`,
+  });
+  if (error) {
+    alert(error.message);
+  } else {
+    alert('Password reset email sent! Check your inbox.');
+  }
+};
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
