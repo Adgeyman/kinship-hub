@@ -7,15 +7,32 @@ export default function ResetPassword() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    // Check if we have the access token in the URL
-    const hashParams = new URLSearchParams(window.location.hash.substring(1));
-    const accessToken = hashParams.get('access_token');
-    
-    if (!accessToken) {
-      setError('Invalid or expired reset link. Please request a new one.');
-    }
+    // Check if user is authenticated (Supabase auto-logs them in)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        setIsAuthenticated(true);
+      } else {
+        // If not authenticated, check for token in URL
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const accessToken = hashParams.get('access_token');
+        if (!accessToken) {
+          setError('Invalid or expired reset link. Please request a new one.');
+        } else {
+          // If token exists but user not authenticated, try to set session
+          supabase.auth.setSession({ access_token: accessToken, refresh_token: '' })
+            .then(({ data, error }) => {
+              if (error) {
+                setError('Invalid or expired reset link.');
+              } else if (data.session) {
+                setIsAuthenticated(true);
+              }
+            });
+        }
+      }
+    });
   }, []);
 
   const handleResetPassword = async (e: React.FormEvent) => {
@@ -41,7 +58,7 @@ export default function ResetPassword() {
     if (error) {
       setError(error.message);
     } else {
-      setMessage('Password updated successfully! Redirecting to login...');
+      setMessage('✅ Password updated successfully! Redirecting to login...');
       setTimeout(() => {
         supabase.auth.signOut();
         window.location.href = '/';
@@ -50,11 +67,23 @@ export default function ResetPassword() {
     setLoading(false);
   };
 
+  if (!isAuthenticated && !error) {
+    return (
+      <div style={{ maxWidth: '400px', margin: '0 auto', padding: '40px 20px', textAlign: 'center' }}>
+        <p>Loading...</p>
+      </div>
+    );
+  }
+
   return (
     <div style={{ maxWidth: '400px', margin: '0 auto', padding: '40px 20px' }}>
       <h1 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '20px' }}>
-        Create New Password
+        🔐 Create New Password
       </h1>
+      
+      <p style={{ color: '#64748B', marginBottom: '20px' }}>
+        Enter your new password below.
+      </p>
       
       {error && (
         <div style={{ background: '#FEE2E2', color: '#991B1B', padding: '12px', borderRadius: '8px', marginBottom: '16px' }}>
@@ -69,9 +98,12 @@ export default function ResetPassword() {
       )}
       
       <form onSubmit={handleResetPassword}>
+        <label style={{ fontSize: '14px', fontWeight: '600', display: 'block', marginBottom: '4px' }}>
+          New Password
+        </label>
         <input
           type="password"
-          placeholder="New password"
+          placeholder="Minimum 6 characters"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           style={{
@@ -86,9 +118,12 @@ export default function ResetPassword() {
           minLength={6}
         />
         
+        <label style={{ fontSize: '14px', fontWeight: '600', display: 'block', marginBottom: '4px' }}>
+          Confirm Password
+        </label>
         <input
           type="password"
-          placeholder="Confirm new password"
+          placeholder="Confirm your new password"
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
           style={{
