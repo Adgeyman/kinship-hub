@@ -495,6 +495,24 @@ function AppContent() {
     setShowAddMember(false);
   };
 
+  const deleteFamilyMember = async (memberId: string) => {
+    if (!session) return;
+    if (!confirm('Are you sure you want to remove this family member? This will also delete their chores and points history.')) return;
+    
+    const { error } = await supabase
+      .from('family_members')
+      .delete()
+      .eq('id', memberId)
+      .eq('user_id', session.user.id);
+    
+    if (error) {
+      alert('Error removing family member: ' + error.message);
+    } else {
+      await loadFamilyMembers(session.user.id);
+      alert('✅ Family member removed successfully.');
+    }
+  };
+
   // ── CHORES ────────────────────────────────────────────────
 
   const addChore = async () => {
@@ -763,20 +781,20 @@ function AppContent() {
     setAuthLoading(false);
   };
 
- const handleForgotPassword = async () => {
-  if (!email) {
-    alert('Enter your email address first');
-    return;
-  }
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${window.location.origin}/reset-password`,
-  });
-  if (error) {
-    alert(error.message);
-  } else {
-    alert('Password reset email sent! Check your inbox.');
-  }
-};
+  const handleForgotPassword = async () => {
+    if (!email) {
+      alert('Enter your email address first');
+      return;
+    }
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    if (error) {
+      alert(error.message);
+    } else {
+      alert('Password reset email sent! Check your inbox.');
+    }
+  };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -1669,6 +1687,16 @@ function AppContent() {
                   <span style={S.memberItemName}>{member.name}</span>
                   <span style={S.rolePill}>{member.role}</span>
                   <span style={S.memberItemPts}>⭐ {member.total_points}</span>
+                  <button
+                    onClick={() => {
+                      requirePin('Remove family member?', () => deleteFamilyMember(member.id));
+                    }}
+                    style={S.deleteMemberBtn}
+                    aria-label="Remove family member"
+                    title="Remove family member (PIN required)"
+                  >
+                    ✕
+                  </button>
                 </div>
               ))}
 
@@ -2178,6 +2206,19 @@ const S: Record<string, React.CSSProperties> = {
     borderRadius: 6,
     fontWeight: 700,
     marginLeft: 4,
+  },
+  deleteMemberBtn: {
+    background: 'none',
+    border: 'none',
+    color: '#EF4444',
+    cursor: 'pointer',
+    fontSize: '16px',
+    padding: '4px 8px',
+    borderRadius: '6px',
+    fontWeight: 700,
+    marginLeft: 'auto',
+    opacity: 0.6,
+    transition: 'opacity 0.15s',
   },
   fieldLabel: { fontSize: 13, color: '#64748B', whiteSpace: 'nowrap' as const, flexShrink: 0 },
   header: {
