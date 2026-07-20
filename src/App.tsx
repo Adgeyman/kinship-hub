@@ -48,6 +48,7 @@ interface ShoppingItem {
   name: string;
   quantity: number;
   is_checked: boolean;
+  sort_order: number;
 }
 
 interface Reward {
@@ -370,6 +371,7 @@ function AppContent() {
         .select('*')
         .eq('list_id', list.id)
         .order('is_checked')
+        .order('sort_order', { ascending: true })
         .order('name');
       if (items) setShoppingItems(items);
     }
@@ -600,11 +602,22 @@ function AppContent() {
       .eq('user_id', session.user.id)
       .single();
     if (list) {
+      // Get the current max sort_order
+      const { data: items } = await supabase
+        .from('shopping_items')
+        .select('sort_order')
+        .eq('list_id', list.id)
+        .order('sort_order', { ascending: false })
+        .limit(1);
+      
+      const nextOrder = items && items.length > 0 ? items[0].sort_order + 1 : 0;
+      
       await supabase.from('shopping_items').insert([{
         list_id: list.id,
         name: newShoppingItem.trim(),
         quantity: 1,
         is_checked: false,
+        sort_order: nextOrder,
       }]);
       await loadShoppingList(session.user.id);
       setNewShoppingItem('');
@@ -626,6 +639,54 @@ function AppContent() {
     if (!ids.length) return;
     await supabase.from('shopping_items').delete().in('id', ids);
     await loadShoppingList(session.user.id);
+  };
+
+  // ── SHOPPING LIST REORDERING ─────────────────────────────
+
+  const moveItemUp = async (index: number) => {
+    if (index === 0 || !session) return;
+    const newItems = [...shoppingItems];
+    const temp = newItems[index];
+    newItems[index] = newItems[index - 1];
+    newItems[index - 1] = temp;
+    
+    // Update sort_order for all items
+    const updates = newItems.map((item, i) => ({
+      id: item.id,
+      sort_order: i,
+    }));
+    
+    for (const update of updates) {
+      await supabase
+        .from('shopping_items')
+        .update({ sort_order: update.sort_order })
+        .eq('id', update.id);
+    }
+    
+    setShoppingItems(newItems);
+  };
+
+  const moveItemDown = async (index: number) => {
+    if (index === shoppingItems.length - 1 || !session) return;
+    const newItems = [...shoppingItems];
+    const temp = newItems[index];
+    newItems[index] = newItems[index + 1];
+    newItems[index + 1] = temp;
+    
+    // Update sort_order for all items
+    const updates = newItems.map((item, i) => ({
+      id: item.id,
+      sort_order: i,
+    }));
+    
+    for (const update of updates) {
+      await supabase
+        .from('shopping_items')
+        .update({ sort_order: update.sort_order })
+        .eq('id', update.id);
+    }
+    
+    setShoppingItems(newItems);
   };
 
   // ── REWARDS ───────────────────────────────────────────────
@@ -1315,7 +1376,7 @@ function AppContent() {
               </div>
             ) : (
               <div style={S.card}>
-                {shoppingItems.filter(i => !i.is_checked).map(item => (
+                {shoppingItems.filter(i => !i.is_checked).map((item, index) => (
                   <div key={item.id} style={S.shopRow}>
                     <button
                       onClick={() => toggleShoppingItem(item.id, item.is_checked)}
@@ -1328,6 +1389,24 @@ function AppContent() {
                       {item.name}
                       {item.quantity > 1 ? ` ×${item.quantity}` : ''}
                     </span>
+                    <div style={{ display: 'flex', gap: '2px' }}>
+                      <button
+                        onClick={() => moveItemUp(index)}
+                        style={{ ...S.sortBtn, opacity: index === 0 ? 0.2 : 0.7 }}
+                        disabled={index === 0}
+                        aria-label="Move up"
+                      >
+                        ▲
+                      </button>
+                      <button
+                        onClick={() => moveItemDown(index)}
+                        style={{ ...S.sortBtn, opacity: index === shoppingItems.filter(i => !i.is_checked).length - 1 ? 0.2 : 0.7 }}
+                        disabled={index === shoppingItems.filter(i => !i.is_checked).length - 1}
+                        aria-label="Move down"
+                      >
+                        ▼
+                      </button>
+                    </div>
                     <button
                       onClick={() => deleteShoppingItem(item.id)}
                       style={S.deleteBtn}
@@ -1352,6 +1431,7 @@ function AppContent() {
                         <span style={{ ...S.shopName, textDecoration: 'line-through' }}>
                           {item.name}
                         </span>
+                        <div style={{ width: '52px' }} /> {/* Spacer to align with other rows */}
                         <button onClick={() => deleteShoppingItem(item.id)} style={S.deleteBtn}>
                           ✕
                         </button>
@@ -2219,6 +2299,17 @@ const S: Record<string, React.CSSProperties> = {
     marginLeft: 'auto',
     opacity: 0.6,
     transition: 'opacity 0.15s',
+  },
+  sortBtn: {
+    background: 'none',
+    border: 'none',
+    color: '#4F46E5',
+    cursor: 'pointer',
+    fontSize: '14px',
+    padding: '2px 4px',
+    lineHeight: 1,
+    borderRadius: '4px',
+    transition: 'opacity 0.2s',
   },
   fieldLabel: { fontSize: 13, color: '#64748B', whiteSpace: 'nowrap' as const, flexShrink: 0 },
   header: {
